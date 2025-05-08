@@ -26,8 +26,53 @@ type FormData = {
   redesSociales: string
 }
 
+type QuestionType = "text" | "email" | "radio" | "checkbox"
+
+type BaseQuestion = {
+  id: keyof FormData
+  title: string
+  type: QuestionType
+}
+
+type TextQuestion = BaseQuestion & {
+  type: "text" | "email"
+  placeholder: string
+  options?: never
+  validation: (value: string) => boolean
+}
+
+type RadioQuestion = BaseQuestion & {
+  type: "radio"
+  options: string[]
+  placeholder?: never
+  validation: (value: string) => boolean
+}
+
+type CheckboxQuestion = BaseQuestion & {
+  type: "checkbox"
+  options: string[]
+  placeholder?: never
+  validation: (value: string[]) => boolean
+}
+
+type Question = TextQuestion | RadioQuestion | CheckboxQuestion
+
+type QuestionValidation = {
+  text: (value: string) => boolean
+  email: (value: string) => boolean
+  radio: (value: string) => boolean
+  checkbox: (value: string[]) => boolean
+}
+
+const validations: QuestionValidation = {
+  text: (value: string) => value.trim().length > 0,
+  email: (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+  radio: (value: string) => value.length > 0,
+  checkbox: (value: string[]) => value.length > 0,
+}
+
 // Preguntas del cuestionario
-const questions = [
+const questions: Question[] = [
   {
     id: "empresa",
     title: "Nombre de la empresa",
@@ -113,7 +158,7 @@ const questions = [
     options: ["Sin presencia", "Presencia básica", "Presencia activa", "Estrategia completa de redes sociales"],
     validation: (value: string) => value.length > 0,
   },
-]
+] as const
 
 export default function Cuestionario() {
   const router = useRouter()
@@ -136,48 +181,52 @@ export default function Cuestionario() {
   const currentQuestion = questions[currentStep]
   const progress = (currentStep / questions.length) * 100
 
-  const handleTextChange = (id: string, value: string) => {
+  const handleTextChange = (id: keyof FormData, value: string) => {
     setFormData({ ...formData, [id]: value })
     setTouched({ ...touched, [id]: true })
-
-    const isValid = currentQuestion.validation(value)
-    setErrors({ ...errors, [id]: !isValid })
-  }
-
-  const handleRadioChange = (id: string, value: string) => {
-    setFormData({ ...formData, [id]: value })
-    setTouched({ ...touched, [id]: true })
-    setErrors({ ...errors, [id]: false })
-  }
-
-  const handleCheckboxChange = (id: string, value: string, checked: boolean) => {
-    const currentValues = [...(formData[id as keyof FormData] as string[])]
-
-    if (checked) {
-      currentValues.push(value)
-    } else {
-      const index = currentValues.indexOf(value)
-      if (index > -1) {
-        currentValues.splice(index, 1)
-      }
+    
+    const question = questions.find(q => q.id === id) as TextQuestion
+    if (question) {
+      const isValid = question.validation(value)
+      setErrors({ ...errors, [id]: !isValid })
     }
+  }
 
-    setFormData({ ...formData, [id]: currentValues })
+  const handleRadioChange = (id: keyof FormData, value: string) => {
+    setFormData({ ...formData, [id]: value })
+    setTouched({ ...touched, [id]: true })
+    
+    const question = questions.find(q => q.id === id) as RadioQuestion
+    if (question) {
+      const isValid = question.validation(value)
+      setErrors({ ...errors, [id]: !isValid })
+    }
+  }
+
+  const handleCheckboxChange = (id: keyof FormData, value: string, checked: boolean) => {
+    const currentValues = formData[id] as string[]
+    const newValues = checked 
+      ? [...currentValues, value]
+      : currentValues.filter(v => v !== value)
+
+    setFormData({ ...formData, [id]: newValues })
     setTouched({ ...touched, [id]: true })
 
-    const isValid = currentQuestion.validation(currentValues)
-    setErrors({ ...errors, [id]: !isValid })
+    const question = questions.find(q => q.id === id) as CheckboxQuestion
+    if (question) {
+      const isValid = question.validation(newValues)
+      setErrors({ ...errors, [id]: !isValid })
+    }
   }
 
   const validateCurrentStep = () => {
-    const id = currentQuestion.id
-    const value = formData[id as keyof FormData]
-    const isValid = currentQuestion.validation(value)
-
-    setTouched({ ...touched, [id]: true })
-    setErrors({ ...errors, [id]: !isValid })
-
-    return isValid
+    const question = currentQuestion
+    const value = formData[question.id]
+    
+    if (question.type === "checkbox") {
+      return question.validation(value as string[])
+    }
+    return question.validation(value as string)
   }
 
   const handleNext = () => {
@@ -186,10 +235,54 @@ export default function Cuestionario() {
     if (currentStep < questions.length - 1) {
       setCurrentStep(currentStep + 1)
     } else {
-      // Guardar resultados en localStorage para acceder desde la página de resultados
-      localStorage.setItem("securelups-results", JSON.stringify(formData))
+      // Calcular el nivel de riesgo basado en las respuestas
+      const riesgoTotal = calculateRiskScore(formData)
+      
+      // Crear el objeto de resultado con ID único y fecha
+      const result = {
+        id: Date.now().toString(),
+        ...formData,
+        fechaCreacion: new Date().toISOString(),
+        riesgoTotal,
+      }
+
+      // Guardar el resultado individual
+      localStorage.setItem("securelups-results", JSON.stringify(result))
+
+      // Obtener y actualizar la lista completa de resultados
+      const existingResults = JSON.parse(localStorage.getItem("securelups-all-results") || "[]")
+      existingResults.push(result)
+      localStorage.setItem("securelups-all-results", JSON.stringify(existingResults))
+
       router.push("/resultados")
     }
+  }
+
+  const calculateRiskScore = (data: FormData): number => {
+    let score = 0
+    const maxScore = 100
+
+    // Evaluar herramientas de seguridad
+    if (data.herramientasSeguridad === "Soluciones avanzadas (EDR, SIEM)") score += 25
+    else if (data.herramientasSeguridad === "Solución completa (antivirus, firewall, etc.)") score += 15
+    else if (data.herramientasSeguridad === "Antivirus básico") score += 5
+
+    // Evaluar formación
+    if (data.formacion === "Programa continuo de formación") score += 25
+    else if (data.formacion === "Completa para todos los empleados") score += 15
+    else if (data.formacion === "Básica para algunos empleados") score += 5
+
+    // Evaluar política de contraseñas
+    if (data.politicaContrasenas === "Uso de gestores de contraseñas y 2FA") score += 25
+    else if (data.politicaContrasenas === "Política avanzada con requisitos de complejidad") score += 15
+    else if (data.politicaContrasenas === "Política básica") score += 5
+
+    // Evaluar eliminación de datos
+    if (data.eliminacionDatos === "Procedimiento certificado") score += 25
+    else if (data.eliminacionDatos === "Borrado seguro") score += 15
+    else if (data.eliminacionDatos === "Eliminación básica") score += 5
+
+    return Math.min(score, maxScore)
   }
 
   const handlePrevious = () => {
@@ -222,7 +315,7 @@ export default function Cuestionario() {
             </span>
             <span>{Math.round(progress)}%</span>
           </div>
-          <Progress value={progress} className="h-2 bg-gray-800" indicatorClassName="bg-cyan-500" />
+          <Progress value={progress} className="h-2 bg-gray-800 [&>div]:bg-cyan-500" />
         </div>
 
         <AnimatePresence mode="wait">
@@ -243,7 +336,7 @@ export default function Cuestionario() {
                     <Input
                       id={currentQuestion.id}
                       value={formData[currentQuestion.id as keyof FormData] as string}
-                      onChange={(e) => handleTextChange(currentQuestion.id, e.target.value)}
+                      onChange={(e) => handleTextChange(currentQuestion.id as keyof FormData, e.target.value)}
                       placeholder={currentQuestion.placeholder}
                       className={`bg-[#252525] border-gray-700 focus:border-cyan-500 ${
                         touched[currentQuestion.id] && errors[currentQuestion.id] ? "border-red-500" : ""

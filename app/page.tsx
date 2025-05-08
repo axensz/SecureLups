@@ -3,7 +3,6 @@ import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { PricingPlans } from "@/components/pricing-plans"
 import { Workshops } from "@/components/workshops"
-import { Testimonials } from "@/components/testimonials"
 import { FAQ } from "@/components/faq"
 import { Footer } from "@/components/footer"
 import { Consultoria } from "@/components/consultoria"
@@ -98,9 +97,6 @@ export default function Home() {
 
       {/* Nueva sección de Consultoría */}
       <Consultoria />
-
-      {/* Sección de Testimonios */}
-      <Testimonials />
 
       {/* Sección de FAQ */}
       <FAQ />
