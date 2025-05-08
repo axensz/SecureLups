@@ -10,8 +10,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  basePath: '/SecureLups',
-  assetPrefix: '/SecureLups/',
+  basePath: '',
+  assetPrefix: '',
+  trailingSlash: true,
+  distDir: 'out'
 }
 
 export default nextConfig
