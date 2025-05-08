@@ -6,9 +6,12 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  output: 'export',
   images: {
     unoptimized: true,
   },
+  basePath: '/SecureLups',
+  assetPrefix: '/SecureLups/',
 }
 
 export default nextConfig
