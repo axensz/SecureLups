@@ -1,165 +1,182 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Header } from "@/components/header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { formatDistanceToNow } from "date-fns"
-import { es } from "date-fns/locale"
-import { Button } from "@/components/ui/button"
-
-type QuestionnaireResult = {
-  id: string
-  empresa: string
-  email: string
-  sector: string
-  tecnologias: string[]
-  mantenimientoTI: string
-  herramientasSeguridad: string
-  formacion: string
-  politicaContrasenas: string
-  eliminacionDatos: string
-  redesSociales: string
-  fechaCreacion: string
-  riesgoTotal: number
-}
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { getAllResults } from '@/lib/firestore'
+import type { QuestionnaireResult } from '@/lib/firestore'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Shield, AlertTriangle, Clock, CheckCircle, LogOut } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { signOut, onAuthStateChange } from '@/lib/auth'
 
 export default function Dashboard() {
   const router = useRouter()
   const [results, setResults] = useState<QuestionnaireResult[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Verificar autenticación
-    const isAuthenticated = localStorage.getItem("securelups-admin-auth")
-    if (!isAuthenticated) {
-      router.push("/dashboard/login")
-      return
-    }
+    const unsubscribe = onAuthStateChange((user) => {
+      if (!user) {
+        router.push('/dashboard/login')
+        return
+      }
 
-    // Cargar resultados
-    const storedResults = localStorage.getItem("securelups-all-results")
-    if (storedResults) {
-      setResults(JSON.parse(storedResults))
-    }
+      const loadResults = async () => {
+        try {
+          const data = await getAllResults()
+          setResults(data)
+        } catch (error) {
+          console.error('Error loading results:', error)
+        } finally {
+          setLoading(false)
+        }
+      }
+
+      loadResults()
+    })
+
+    return () => unsubscribe()
   }, [router])
 
-  const handleLogout = () => {
-    localStorage.removeItem("securelups-admin-auth")
-    router.push("/dashboard/login")
+  const handleLogout = async () => {
+    try {
+      await signOut()
+      router.push('/dashboard/login')
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error)
+    }
   }
 
   const getRiskLevel = (score: number) => {
-    if (score <= 30) return { label: "Alto", color: "bg-red-500" }
-    if (score <= 70) return { label: "Medio", color: "bg-yellow-500" }
-    return { label: "Bajo", color: "bg-green-500" }
+    if (score >= 80) return { text: 'Excelente', color: 'text-green-500', icon: CheckCircle }
+    if (score >= 60) return { text: 'Regular', color: 'text-yellow-500', icon: Clock }
+    if (score >= 40) return { text: 'Bajo', color: 'text-orange-500', icon: AlertTriangle }
+    return { text: 'Crítico', color: 'text-red-500', icon: Shield }
+  }
+
+  const handleViewDetails = (id: string) => {
+    router.push(`/dashboard/${id}`)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-lg">Cargando resultados...</p>
+      </div>
+    )
   }
 
   return (
-    <main className="flex min-h-screen flex-col">
-      <Header />
-      <div className="container max-w-7xl py-12">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Dashboard de Administrador</h1>
-            <p className="text-gray-400">Monitoreo de evaluaciones de seguridad</p>
-          </div>
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            className="border-gray-700 hover:bg-gray-800 text-gray-300"
-          >
-            Cerrar Sesión
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-[#1a1a1a] border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-xl">Total Evaluaciones</CardTitle>
-              <CardDescription>Número de evaluaciones realizadas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{results.length}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-[#1a1a1a] border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-xl">Riesgo Alto</CardTitle>
-              <CardDescription>Empresas en riesgo alto</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-red-500">
-                {results.filter((r) => r.riesgoTotal <= 30).length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="bg-[#1a1a1a] border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-xl">Última Evaluación</CardTitle>
-              <CardDescription>Tiempo desde la última evaluación</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl">
-                {results.length > 0
-                  ? formatDistanceToNow(new Date(results[results.length - 1].fechaCreacion), {
-                      locale: es,
-                      addSuffix: true,
-                    })
-                  : "No hay evaluaciones"}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="bg-[#1a1a1a] border border-gray-800 rounded-lg">
-          <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Evaluaciones Recientes</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-[#252525] text-left">
-                <tr>
-                  <th className="p-4 font-medium">Empresa</th>
-                  <th className="p-4 font-medium">Sector</th>
-                  <th className="p-4 font-medium">Email</th>
-                  <th className="p-4 font-medium">Fecha</th>
-                  <th className="p-4 font-medium">Nivel de Riesgo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800">
-                {results.map((result) => (
-                  <tr key={result.id} className="hover:bg-[#252525]">
-                    <td className="p-4">{result.empresa}</td>
-                    <td className="p-4">{result.sector}</td>
-                    <td className="p-4">{result.email}</td>
-                    <td className="p-4">
-                      {formatDistanceToNow(new Date(result.fechaCreacion), {
-                        locale: es,
-                        addSuffix: true,
-                      })}
-                    </td>
-                    <td className="p-4">
-                      <Badge
-                        className={`${getRiskLevel(result.riesgoTotal).color} text-black`}
-                      >
-                        {getRiskLevel(result.riesgoTotal).label}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-                {results.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="p-4 text-center text-gray-400">
-                      No hay evaluaciones registradas
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Dashboard de Evaluaciones</h1>
+        <Button
+          variant="outline"
+          onClick={handleLogout}
+          className="flex items-center gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          Cerrar Sesión
+        </Button>
       </div>
-    </main>
+      
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Evaluaciones</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{results.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Riesgo Crítico</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {results.filter(r => r.riesgoTotal < 40).length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Riesgo Bajo</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {results.filter(r => r.riesgoTotal >= 40 && r.riesgoTotal < 60).length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Riesgo Regular</CardTitle>
+            <Clock className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {results.filter(r => r.riesgoTotal >= 60 && r.riesgoTotal < 80).length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Evaluaciones Recientes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {results.length === 0 ? (
+            <p className="text-center text-muted-foreground">No hay evaluaciones registradas</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>Sector</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Nivel de Riesgo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {results.map((result) => {
+                  const riskLevel = getRiskLevel(result.riesgoTotal)
+                  const Icon = riskLevel.icon
+                  return (
+                    <TableRow 
+                      key={result.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleViewDetails(result.id!)}
+                    >
+                      <TableCell>{result.empresa}</TableCell>
+                      <TableCell>{result.sector}</TableCell>
+                      <TableCell>{result.email}</TableCell>
+                      <TableCell>
+                        {new Date(result.fechaCreacion || '').toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Icon className={`h-4 w-4 ${riskLevel.color}`} />
+                          <span className={riskLevel.color}>{riskLevel.text}</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 } 

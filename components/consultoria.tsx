@@ -16,6 +16,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import Link from "next/link"
+import { MessageCircle } from "lucide-react"
 
 export function Consultoria() {
   const [formData, setFormData] = useState({
@@ -100,10 +102,10 @@ export function Consultoria() {
           seguridad de tu empresa.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center max-w-2xl mx-auto">
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-cyan-500 hover:bg-cyan-600 text-black font-medium px-8 py-6">
+              <Button className="bg-cyan-500 hover:bg-cyan-600 text-black font-medium px-8 py-6 flex-1 sm:flex-none w-full sm:w-auto">
                 Solicitar Consultoría
               </Button>
             </DialogTrigger>
@@ -218,54 +220,16 @@ export function Consultoria() {
 
               <div className="pt-4 text-center border-t border-gray-800">
                 <p className="text-sm text-gray-400 mb-3">O contáctanos directamente por WhatsApp</p>
-                <a
-                  href="https://wa.me/573004366237"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="lucide lucide-message-circle"
-                  >
-                    <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-                  </svg>
-                  WhatsApp
-                </a>
               </div>
             </DialogContent>
           </Dialog>
 
-          <a
-            href="https://wa.me/573004366237"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-8 py-6 rounded-md transition-colors"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="lucide lucide-message-circle"
-            >
-              <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-            </svg>
-            Contactar por WhatsApp
-          </a>
+          <Button asChild variant="outline" className="border-cyan-700 hover:bg-cyan-950/30 text-cyan-400 px-8 py-6 flex-1 sm:flex-none w-full sm:w-auto">
+            <Link href="https://wa.me/573004366237" target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Chatea por WhatsApp
+            </Link>
+          </Button>
         </div>
       </div>
     </section>

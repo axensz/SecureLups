@@ -11,6 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { motion, AnimatePresence } from "framer-motion"
 import { CheckCircle2, XCircle } from "lucide-react"
+import { saveQuestionnaireResult } from "@/lib/firestore"
+import { toast } from "sonner"
 
 // Definir los tipos para las respuestas
 type FormData = {
@@ -163,6 +165,7 @@ const questions: Question[] = [
 export default function Cuestionario() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     empresa: "",
     email: "",
@@ -229,32 +232,29 @@ export default function Cuestionario() {
     return question.validation(value as string)
   }
 
-  const handleNext = () => {
-    if (!validateCurrentStep()) return
-
+  const handleNext = async () => {
     if (currentStep < questions.length - 1) {
       setCurrentStep(currentStep + 1)
     } else {
-      // Calcular el nivel de riesgo basado en las respuestas
-      const riesgoTotal = calculateRiskScore(formData)
-      
-      // Crear el objeto de resultado con ID único y fecha
-      const result = {
-        id: Date.now().toString(),
-        ...formData,
-        fechaCreacion: new Date().toISOString(),
-        riesgoTotal,
+      try {
+        // Calcular el riesgo total basado en las respuestas
+        const riesgoTotal = calculateRiskScore(formData)
+        
+        // Guardar el resultado en Firestore
+        const resultId = await saveQuestionnaireResult({
+          ...formData,
+          riesgoTotal
+        })
+
+        // Guardar el ID del resultado en localStorage
+        localStorage.setItem("lastQuestionnaireId", resultId)
+        
+        toast.success("Resultados guardados correctamente")
+        router.push(`/resultados?id=${resultId}`)
+      } catch (error) {
+        console.error("Error saving results:", error)
+        toast.error("Error al guardar los resultados")
       }
-
-      // Guardar el resultado individual
-      localStorage.setItem("securelups-results", JSON.stringify(result))
-
-      // Obtener y actualizar la lista completa de resultados
-      const existingResults = JSON.parse(localStorage.getItem("securelups-all-results") || "[]")
-      existingResults.push(result)
-      localStorage.setItem("securelups-all-results", JSON.stringify(existingResults))
-
-      router.push("/resultados")
     }
   }
 
@@ -298,37 +298,22 @@ export default function Cuestionario() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col">
+    <div className="min-h-screen bg-[#121212]">
       <Header />
-      <div className="container max-w-3xl py-12">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl md:text-3xl font-bold mb-4">
-            Responde estas preguntas para evaluar tu nivel de seguridad
-          </h1>
-          <p className="text-gray-300">Completa el siguiente cuestionario para recibir un diagnóstico personalizado.</p>
-        </div>
-
-        <div className="mb-8">
-          <div className="flex justify-between text-sm text-gray-400 mb-2">
-            <span>
-              Pregunta {currentStep + 1} de {questions.length}
-            </span>
-            <span>{Math.round(progress)}%</span>
-          </div>
-          <Progress value={progress} className="h-2 bg-gray-800 [&>div]:bg-cyan-500" />
-        </div>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-6 shadow-lg"
-          >
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold">{currentQuestion.title}</h2>
+      <main className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto">
+          <Progress value={progress} className="mb-8" />
+          
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-[#1E1E1E] p-6 rounded-lg shadow-lg"
+            >
+              <h2 className="text-2xl font-bold mb-6">{currentQuestion.title}</h2>
 
               {currentQuestion.type === "text" && (
                 <div className="space-y-2">
@@ -435,25 +420,26 @@ export default function Cuestionario() {
                   )}
                 </div>
               )}
-            </div>
-          </motion.div>
-        </AnimatePresence>
 
-        <div className="mt-8 flex justify-between">
-          <Button
-            onClick={handlePrevious}
-            disabled={currentStep === 0}
-            variant="outline"
-            className="border-gray-700 hover:bg-gray-800 text-gray-300"
-          >
-            Anterior
-          </Button>
-
-          <Button onClick={handleNext} className="bg-cyan-500 hover:bg-cyan-600 text-black font-medium">
-            {currentStep === questions.length - 1 ? "Ver Resultados" : "Siguiente"}
-          </Button>
+              <div className="flex justify-between mt-8">
+                <Button
+                  variant="outline"
+                  onClick={handlePrevious}
+                  disabled={currentStep === 0}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  disabled={!isCurrentStepValid() || isSubmitting}
+                >
+                  {isSubmitting ? "Guardando..." : currentStep === questions.length - 1 ? "Finalizar" : "Siguiente"}
+                </Button>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }

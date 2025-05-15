@@ -1,3 +1,6 @@
+"use client"
+
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
@@ -8,6 +11,8 @@ import { Footer } from "@/components/footer"
 import { Consultoria } from "@/components/consultoria"
 
 export default function Home() {
+  const router = useRouter()
+
   return (
     <main className="flex min-h-screen flex-col">
       <Header />
